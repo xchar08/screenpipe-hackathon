@@ -9,6 +9,9 @@ import requests
 from bs4 import BeautifulSoup
 import urllib.parse
 import time
+from PyQt5.QtWidgets import QMessageBox, QApplication
+from voice.voice_output import say
+import speech_recognition as sr
 
 def execute_command(action, **kwargs):
     if action == "click":
@@ -89,17 +92,14 @@ def open_url(query: str):
     try:
         response = requests.get(search_url, headers=headers)
         soup = BeautifulSoup(response.text, "html.parser")
-        # DuckDuckGo results typically have links with class "result__a"
         first_result = soup.find("a", class_="result__a")
         if first_result and first_result.get("href"):
             url = first_result.get("href")
-            # Check if URL is a redirect link containing 'uddg' parameter
             parsed = urllib.parse.urlparse(url)
             qs = urllib.parse.parse_qs(parsed.query)
             if "uddg" in qs:
                 url = qs["uddg"][0]
         else:
-            # Fallback: assume query as a domain name
             url_candidate = query.replace(" ", "")
             url = f"https://www.{url_candidate}.com"
         webbrowser.open(url)
@@ -119,14 +119,11 @@ def close_app(app_name: str):
 
 def close_url(query: str):
     """
-    Closes the browser tab by simulating the 'Ctrl+W' (or 'Cmd+W' on macOS) keystroke.
-    This function assumes that the target browser tab is active.
+    Closes the active browser tab by simulating the 'Ctrl+W' (or 'Cmd+W' on macOS) keystroke.
+    Assumes the target browser tab is active.
     """
     print(f"Attempting to close browser tab for query: {query}")
-    # Optionally, you could add logic here to switch focus to the correct tab.
-    # For now, we'll assume the correct tab is active.
     try:
-        # On macOS use "command+w", on Windows/Linux use "ctrl+w"
         if platform.system() == "Darwin":
             keyboard.send("command+w")
         else:
@@ -149,11 +146,84 @@ def pause_audio():
     except Exception as e:
         print("Error pausing audio:", e)
 
+def listen_for_yes_no():
+    """
+    Listens until the user stops speaking and returns True if 'yes' is in the response,
+    False if 'no' is in the response, or None if unrecognized.
+    """
+    r = sr.Recognizer()
+    with sr.Microphone() as source:
+        r.adjust_for_ambient_noise(source)
+        try:
+            print("Listening for yes/no response...")
+            audio = r.listen(source, phrase_time_limit=3)
+            response = r.recognize_google(audio).lower()
+            print("Voice response received:", response)
+            if "yes" in response:
+                return True
+            elif "no" in response:
+                return False
+            else:
+                return None
+        except Exception as e:
+            print("Voice recognition error:", e)
+            return None
+
+def get_confirmation(prompt: str):
+    """
+    First, try to get a yes/no answer from voice input (listening until silence).
+    If no valid voice response is received, fall back to a popup dialog.
+    """
+    say(prompt)
+    voice_response = listen_for_yes_no()
+    if voice_response is not None:
+        return voice_response
+    else:
+        reply = QMessageBox.question(
+            QApplication.activeWindow(),
+            "Confirm",
+            prompt,
+            QMessageBox.Yes | QMessageBox.No
+        )
+        return True if reply == QMessageBox.Yes else False
+
 def search_term(term: str):
+    """
+    Searches the term using DuckDuckGo and interactively goes through results.
+    For each result, it asks:
+      - Would you like me to read the result title?
+      - Would you like me to open this result?
+    This uses voice input (if available) or a popup for confirmation.
+    """
+    term = term.strip()
+    search_url = "https://html.duckduckgo.com/html/?q=" + re.sub(r'\s+', '+', term)
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     try:
-        query = term.replace(" ", "+")
-        url = f"https://www.google.com/search?q={query}"
-        webbrowser.open(url)
-        print(f"Searched for: {term}")
+        response = requests.get(search_url, headers=headers)
+        soup = BeautifulSoup(response.text, "html.parser")
+        results = soup.find_all("a", class_="result__a")
+        num_results = len(results)
+        msg = f"{num_results} items found for '{term}'."
+        print(msg)
+        say(msg)
+        if num_results == 0:
+            return
+        for i, result in enumerate(results, start=1):
+            title = result.get_text().strip()
+            url = result.get("href")
+            parsed = urllib.parse.urlparse(url)
+            qs = urllib.parse.parse_qs(parsed.query)
+            if "uddg" in qs:
+                url = qs["uddg"][0]
+            prompt_read = f"Result {i}: {title}. Would you like me to read this result?"
+            if get_confirmation(prompt_read):
+                say(title)
+            prompt_open = f"Result {i}: {title}. Would you like me to open this result?"
+            if get_confirmation(prompt_open):
+                webbrowser.open(url)
+                print(f"Opened URL: {url}")
+            prompt_continue = "Would you like me to check the next result?"
+            if not get_confirmation(prompt_continue):
+                break
     except Exception as e:
         print("Error performing search:", e)
