@@ -1,0 +1,8 @@
+PyQt5
+speechrecognition
+pyaudio
+pyautogui
+keyboard
+rapidfuzz
+requests
+python-dotenv
