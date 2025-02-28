@@ -1,5 +1,10 @@
 import os
 import requests
+from dotenv import load_dotenv
+
+# Load .env file from the project root (one directory up from apis/)
+env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+load_dotenv(dotenv_path=env_path)
 
 NEBIUS_API_KEY = os.getenv("NEBIUS_API_KEY")
 NEBIUS_API_URL = "https://api.studio.nebius.ai/v1/chat/completions"

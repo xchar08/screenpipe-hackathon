@@ -1,8 +1,10 @@
 PyQt5
-speechrecognition
+SpeechRecognition
 pyaudio
 pyautogui
 keyboard
 rapidfuzz
 requests
 python-dotenv
+pyttsx3
+beautifulsoup4

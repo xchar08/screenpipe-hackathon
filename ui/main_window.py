@@ -7,7 +7,7 @@ class CircularWidget(QWidget):
         super().__init__(parent)
         self.active = False
         self.setFixedSize(200, 200)
-        self.pixmap = QPixmap("assets/shiba_inu.png")
+        self.pixmap = QPixmap("assets/tofu.png")
         self.glow_alpha = 0
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_glow)
@@ -51,6 +51,8 @@ class CircularWidget(QWidget):
 
 class MainWindow(QMainWindow):
     commandReceived = pyqtSignal(str)
+    startGlowSignal = pyqtSignal()
+    stopGlowSignal = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -59,6 +61,8 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.widget)
         self.resize(220, 220)
         self.commandReceived.connect(self.handle_command)
+        self.startGlowSignal.connect(self.startGlow)
+        self.stopGlowSignal.connect(self.stopGlow)
 
         from assistant.assistant import Assistant
         self.assistant = Assistant()
@@ -67,8 +71,10 @@ class MainWindow(QMainWindow):
     def handle_command(self, command):
         self.assistant.process_command(command)
 
+    @pyqtSlot()
     def startGlow(self):
         self.widget.start_glow()
 
+    @pyqtSlot()
     def stopGlow(self):
         self.widget.stop_glow()

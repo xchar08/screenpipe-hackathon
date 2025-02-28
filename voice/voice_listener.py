@@ -2,7 +2,7 @@ import time
 import speech_recognition as sr
 from rapidfuzz import fuzz
 
-TARGET_WAKE_WORD = "hey toph"
+TARGET_WAKE_WORD = "hey"
 WAKE_THRESHOLD = 65  # Adjust threshold for minor deviations
 
 class VoiceListener:
@@ -39,10 +39,10 @@ class VoiceListener:
         while True:
             if self.listen_for_wake_word():
                 print("Wake word detected!")
-                self.main_window.startGlow()
+                self.main_window.startGlowSignal.emit()
                 command = self.listen_for_command()
                 if command:
                     print("Command received:", command)
                     self.main_window.commandReceived.emit(command)
-                self.main_window.stopGlow()
+                self.main_window.stopGlowSignal.emit()
             time.sleep(0.5)

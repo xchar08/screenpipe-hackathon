@@ -2,7 +2,13 @@ import pyautogui
 import keyboard
 import os
 import subprocess
+import webbrowser
 import re
+import platform
+import requests
+from bs4 import BeautifulSoup
+import urllib.parse
+import time
 
 def execute_command(action, **kwargs):
     if action == "click":
@@ -36,9 +42,9 @@ def execute_command(action, **kwargs):
             os.makedirs(directory, exist_ok=True)
             with open(full_path, "w") as f:
                 if file_type == "py":
-                    f.write("# Python file created by Toph\n")
+                    f.write("# Python file created by Hey Miso\n")
                 else:
-                    f.write("New file created by Toph.\n")
+                    f.write("New file created by Hey Miso.\n")
             print(f"Created file: {full_path}")
         else:
             print("Could not parse file creation command.")
@@ -58,3 +64,96 @@ def execute_command(action, **kwargs):
             print("Could not parse project creation command.")
     else:
         print("Unknown command action:", action)
+
+def open_app(app_name: str):
+    try:
+        if platform.system() == "Windows":
+            subprocess.Popen(app_name)
+        else:
+            subprocess.Popen(["open", "-a", app_name])
+        print(f"Opened app: {app_name}")
+    except Exception as e:
+        print("Error opening app:", e)
+
+def open_url(query: str):
+    """
+    Use BeautifulSoup to webscrape the first search result for the query.
+    It queries DuckDuckGo’s HTML interface and extracts the first result.
+    If the URL is a DuckDuckGo redirect, it extracts the actual URL from the 'uddg' parameter.
+    """
+    query = query.strip()
+    search_url = "https://html.duckduckgo.com/html/?q=" + re.sub(r'\s+', '+', query)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    }
+    try:
+        response = requests.get(search_url, headers=headers)
+        soup = BeautifulSoup(response.text, "html.parser")
+        # DuckDuckGo results typically have links with class "result__a"
+        first_result = soup.find("a", class_="result__a")
+        if first_result and first_result.get("href"):
+            url = first_result.get("href")
+            # Check if URL is a redirect link containing 'uddg' parameter
+            parsed = urllib.parse.urlparse(url)
+            qs = urllib.parse.parse_qs(parsed.query)
+            if "uddg" in qs:
+                url = qs["uddg"][0]
+        else:
+            # Fallback: assume query as a domain name
+            url_candidate = query.replace(" ", "")
+            url = f"https://www.{url_candidate}.com"
+        webbrowser.open(url)
+        print(f"Opened URL: {url}")
+    except Exception as e:
+        print("Error opening URL:", e)
+
+def close_app(app_name: str):
+    try:
+        if platform.system() == "Windows":
+            subprocess.Popen(["taskkill", "/IM", f"{app_name}.exe", "/F"])
+        else:
+            subprocess.Popen(["pkill", app_name])
+        print(f"Closed app: {app_name}")
+    except Exception as e:
+        print("Error closing app:", e)
+
+def close_url(query: str):
+    """
+    Closes the browser tab by simulating the 'Ctrl+W' (or 'Cmd+W' on macOS) keystroke.
+    This function assumes that the target browser tab is active.
+    """
+    print(f"Attempting to close browser tab for query: {query}")
+    # Optionally, you could add logic here to switch focus to the correct tab.
+    # For now, we'll assume the correct tab is active.
+    try:
+        # On macOS use "command+w", on Windows/Linux use "ctrl+w"
+        if platform.system() == "Darwin":
+            keyboard.send("command+w")
+        else:
+            keyboard.send("ctrl+w")
+        print("Closed active browser tab.")
+    except Exception as e:
+        print("Error closing URL:", e)
+
+def play_audio():
+    try:
+        keyboard.send("play/pause media")
+        print("Toggled audio playback (play).")
+    except Exception as e:
+        print("Error playing audio:", e)
+
+def pause_audio():
+    try:
+        keyboard.send("play/pause media")
+        print("Toggled audio playback (pause).")
+    except Exception as e:
+        print("Error pausing audio:", e)
+
+def search_term(term: str):
+    try:
+        query = term.replace(" ", "+")
+        url = f"https://www.google.com/search?q={query}"
+        webbrowser.open(url)
+        print(f"Searched for: {term}")
+    except Exception as e:
+        print("Error performing search:", e)
