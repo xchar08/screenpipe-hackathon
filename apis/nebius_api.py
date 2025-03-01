@@ -1,8 +1,9 @@
 import os
 import requests
 from dotenv import load_dotenv
+import urllib.parse
 
-# Load .env file from the project root (one directory up from apis/)
+# Load the .env file from the parent directory
 env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
 load_dotenv(dotenv_path=env_path)
 

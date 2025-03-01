@@ -1,7 +1,7 @@
 import re
 from assistant.commands import (
     execute_command, open_app, open_url, close_app, close_url,
-    play_audio, pause_audio, search_term
+    play_audio, pause_audio, search_term, handle_copy_text_command
 )
 from apis.screenpipe_api import get_object_position
 from apis.nebius_api import generate_response as generate_nebius_response
@@ -54,6 +54,9 @@ class Assistant:
             else:
                 say(f"Object {object_name} not found for right-click")
                 print(f"Object '{object_name}' not found for right-click")
+        elif command_lower.startswith("copy text"):
+            # Handle commands like "copy text everything you see" or "copy text in my search bar"
+            handle_copy_text_command(command)
         elif command_lower.startswith("copy"):
             execute_command("copy")
             say("Copied to clipboard.")
@@ -94,6 +97,8 @@ class Assistant:
             term = command_lower.replace("search", "").strip()
             search_term(term)
             say(f"Searching for {term}.")
+        elif command_lower.startswith("what do you see"):
+            self.what_do_you_see()
         else:
             # For ambiguous commands, delegate to Nebius for code generation.
             prompt = (
@@ -114,6 +119,19 @@ class Assistant:
         """
         coords = get_object_position(item)
         return coords
+
+    def what_do_you_see(self):
+        """
+        Uses Screenpipe's OCR to return the text it sees on screen.
+        """
+        from apis.screenpipe_api import get_ocr_text
+        text = get_ocr_text("everything you see")
+        if text:
+            say(f"I see: {text}")
+            print("OCR text:", text)
+        else:
+            say("I couldn't detect any text on screen.")
+            print("No OCR text found.")
 
     def confirm_and_execute_generated_code(self, code_snippet: str):
         """

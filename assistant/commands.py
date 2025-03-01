@@ -86,9 +86,7 @@ def open_url(query: str):
     """
     query = query.strip()
     search_url = "https://html.duckduckgo.com/html/?q=" + re.sub(r'\s+', '+', query)
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-    }
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     try:
         response = requests.get(search_url, headers=headers)
         soup = BeautifulSoup(response.text, "html.parser")
@@ -146,6 +144,32 @@ def pause_audio():
     except Exception as e:
         print("Error pausing audio:", e)
 
+def copy_screen_text(query: str):
+    """
+    Uses Screenpipe's OCR API to retrieve text from the screen.
+    If the query is empty or 'everything you see', it returns all OCR text.
+    Otherwise, it filters OCR results using the query.
+    """
+    from apis.screenpipe_api import get_ocr_text
+    text = get_ocr_text(query)
+    return text
+
+def handle_copy_text_command(command: str):
+    """
+    Handles commands like "copy text everything you see" or
+    "copy text in my search bar" by querying Screenpipe's OCR API.
+    """
+    query = command.lower().replace("copy text", "").strip()
+    if not query:
+        query = "everything you see"
+    text = copy_screen_text(query)
+    if text:
+        say("Text copied from screen.")
+        print("Copied text:", text)
+    else:
+        say("No text found on screen.")
+        print("No text found for query:", query)
+
 def listen_for_yes_no():
     """
     Listens until the user stops speaking and returns True if 'yes' is in the response,
@@ -156,7 +180,7 @@ def listen_for_yes_no():
         r.adjust_for_ambient_noise(source)
         try:
             print("Listening for yes/no response...")
-            audio = r.listen(source, phrase_time_limit=3)
+            audio = r.listen(source)
             response = r.recognize_google(audio).lower()
             print("Voice response received:", response)
             if "yes" in response:
