@@ -15,7 +15,7 @@ class Assistant:
 
     def process_command(self, command: str):
         self.command_history.append(command)
-        # Support chaining commands separated by " and "
+        # Support command chaining separated by " and "
         sub_commands = re.split(r'\s+and\s+', command)
         for sub in sub_commands:
             sub = sub.strip()
@@ -25,11 +25,11 @@ class Assistant:
     def execute(self, command: str):
         command_lower = command.lower()
         if "screen position of" in command_lower:
-            # Use Screenpipe to find the position of an object.
+            # Use Screenpipe to report the position of an object.
             object_name = command_lower.split("screen position of")[-1].strip()
-            pos = get_object_position(object_name)
-            if pos:
-                msg = f"Screen position of '{object_name}': {pos}"
+            coords = get_object_position(object_name)
+            if coords:
+                msg = f"Screen position of '{object_name}': {coords}"
                 print(msg)
                 say(msg)
             else:
@@ -38,22 +38,22 @@ class Assistant:
                 say(msg)
         elif command_lower.startswith("click on"):
             object_name = command_lower.replace("click on", "").strip()
-            pos = get_object_position(object_name)
-            if pos:
-                execute_command("click", position=pos)
+            coords = self.get_click_coordinates(object_name)
+            if coords:
+                execute_command("click", position=coords)
                 say(f"Clicked on {object_name}")
             else:
-                say(f"Object {object_name} not found for click.")
-                print(f"Object '{object_name}' not found for click.")
+                say(f"Could not determine where to click for {object_name}")
+                print(f"Could not determine coordinates for {object_name}")
         elif command_lower.startswith("right click on"):
             object_name = command_lower.replace("right click on", "").strip()
-            pos = get_object_position(object_name)
-            if pos:
-                execute_command("right_click", position=pos)
+            coords = get_object_position(object_name)
+            if coords:
+                execute_command("right_click", position=coords)
                 say(f"Right clicked on {object_name}")
             else:
-                say(f"Object {object_name} not found for right-click.")
-                print(f"Object '{object_name}' not found for right-click.")
+                say(f"Object {object_name} not found for right-click")
+                print(f"Object '{object_name}' not found for right-click")
         elif command_lower.startswith("copy"):
             execute_command("copy")
             say("Copied to clipboard.")
@@ -73,17 +73,17 @@ class Assistant:
             open_app(app_name)
             say(f"Opening app {app_name}")
         elif command_lower.startswith("open url"):
-            url = command_lower.replace("open url", "").strip()
-            open_url(url)
-            say(f"Opening URL {url}")
+            query = command_lower.replace("open url", "").strip()
+            open_url(query)
+            say(f"Opening URL for query: {query}")
         elif command_lower.startswith("close app"):
             app_name = command_lower.replace("close app", "").strip()
             close_app(app_name)
             say(f"Closing app {app_name}")
         elif command_lower.startswith("close url"):
-            url = command_lower.replace("close url", "").strip()
-            close_url(url)
-            say(f"Closing URL {url}")
+            query = command_lower.replace("close url", "").strip()
+            close_url(query)
+            say(f"Closing URL for query: {query}")
         elif command_lower.startswith("play audio"):
             play_audio()
             say("Playing audio.")
@@ -95,7 +95,7 @@ class Assistant:
             search_term(term)
             say(f"Searching for {term}.")
         else:
-            # For ambiguous commands, ask Nebius for Python code using Selenium.
+            # For ambiguous commands, delegate to Nebius for code generation.
             prompt = (
                 f"Generate Python code that uses Selenium to perform the following task: {command}.\n"
                 "The code should be self-contained and include only the code with no explanations."
@@ -107,11 +107,19 @@ class Assistant:
                 say("Sorry, I couldn't generate code for that command.")
                 print("Nebius returned no code; unable to process the command:", command)
 
+    def get_click_coordinates(self, item: str) -> tuple:
+        """
+        Uses Screenpipe's API exclusively to determine the coordinates
+        for clicking on a specified UI element.
+        """
+        coords = get_object_position(item)
+        return coords
+
     def confirm_and_execute_generated_code(self, code_snippet: str):
         """
         Uses Nebius to produce a summary of the generated code, then shows a popup
-        asking the user to confirm execution. The code is written to a temporary file
-        and executed using subprocess.
+        asking the user to confirm whether to execute the code.
+        The code is written to a temporary file and executed using subprocess.
         """
         summary_prompt = f"Summarize and explain what the following code will do:\n{code_snippet}"
         summary = generate_nebius_response(summary_prompt)
