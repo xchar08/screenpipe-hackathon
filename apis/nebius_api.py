@@ -3,7 +3,8 @@ import requests
 from dotenv import load_dotenv
 import urllib.parse
 
-# Load the .env file from the parent directory
+# Load the .env file from the parent directory.
+import os
 env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
 load_dotenv(dotenv_path=env_path)
 

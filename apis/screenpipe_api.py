@@ -1,9 +1,9 @@
 import os
 import requests
 
-# Adjust the URL as needed for your Screenpipe service.
+# Adjust these URLs based on your Screenpipe service configuration.
 SCREENPIPE_API_URL = "http://localhost:3030/search"
-SCREENPIPE_OCR_URL = "http://localhost:3030/ocr"  # Example endpoint for OCR results
+SCREENPIPE_OCR_URL = "http://localhost:3030/ocr"  # Example OCR endpoint
 
 def get_object_position(object_name: str):
     params = {
@@ -17,7 +17,7 @@ def get_object_position(object_name: str):
             data = response.json()
             if data.get("pagination", {}).get("total", 0) > 0:
                 item = data["data"][0]
-                # Assume that Screenpipe returns coordinates in a field named "coordinates".
+                # Assume coordinates are provided in the "coordinates" field.
                 return item.get("coordinates", None)
             else:
                 return None
@@ -31,7 +31,7 @@ def get_object_position(object_name: str):
 def get_ocr_text(query: str):
     """
     Queries Screenpipe's OCR endpoint to retrieve text.
-    If query is specified, filters OCR results by that query; otherwise, returns all OCR text.
+    If query is empty or "everything you see", returns all OCR text.
     """
     params = {
         "q": query,
@@ -41,7 +41,6 @@ def get_ocr_text(query: str):
         response = requests.get(SCREENPIPE_OCR_URL, params=params)
         if response.status_code == 200:
             data = response.json()
-            # Assume OCR text is returned under a key "text" in each item.
             texts = [item.get("text", "") for item in data.get("data", [])]
             return "\n".join(texts).strip()
         else:

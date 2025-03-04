@@ -1,4 +1,6 @@
 import re
+import sys
+import time
 from assistant.commands import (
     execute_command, open_app, open_url, close_app, close_url,
     play_audio, pause_audio, search_term, handle_copy_text_command
@@ -7,6 +9,8 @@ from apis.screenpipe_api import get_object_position
 from apis.nebius_api import generate_response as generate_nebius_response
 from PyQt5.QtWidgets import QMessageBox, QApplication
 from voice.voice_output import say
+import pyautogui
+import speech_recognition as sr
 
 class Assistant:
     def __init__(self):
@@ -55,7 +59,6 @@ class Assistant:
                 say(f"Object {object_name} not found for right-click")
                 print(f"Object '{object_name}' not found for right-click")
         elif command_lower.startswith("copy text"):
-            # Handle commands like "copy text everything you see" or "copy text in my search bar"
             handle_copy_text_command(command)
         elif command_lower.startswith("copy"):
             execute_command("copy")
@@ -63,7 +66,16 @@ class Assistant:
         elif command_lower.startswith("paste"):
             execute_command("paste")
             say("Pasted from clipboard.")
+        elif command_lower.startswith("type in"):
+            # "type in" command: listen for your speech and gradually type it out.
+            prompt = command[len("type in"):].strip()
+            self.type_in(prompt)
+        elif command_lower.startswith("type generate"):
+            # "type generate" command: use Nebius to generate text then type it gradually.
+            prompt = command[len("type generate"):].strip()
+            self.type_generate(prompt)
         elif command_lower.startswith("type"):
+            # Fall back: if just "type" is said, type the remainder instantly.
             text = command[command_lower.find("type") + len("type"):].strip()
             execute_command("type", text=text)
             say(f"Typed: {text}")
@@ -97,10 +109,29 @@ class Assistant:
             term = command_lower.replace("search", "").strip()
             search_term(term)
             say(f"Searching for {term}.")
-        elif command_lower.startswith("what do you see"):
-            self.what_do_you_see()
+        elif command_lower.startswith("live translate near my cursor"):
+            from ui.live_translation_dialog import LiveTranslationDialog
+            dialog = LiveTranslationDialog()
+            dialog.exec_()
+        elif command_lower.startswith("hey jarivs, let's talk"):
+            self.conversational_mode()
+        elif command_lower.startswith("shutdown"):
+            self.shutdown()
+        elif command_lower.startswith("answer this") or command_lower.startswith("answer me"):
+            # Extract the question after "answer this" or "answer me"
+            question = command.split("answer", 1)[1].strip()
+            prompt = f"Answer the following question in a cute and friendly tone: {question}"
+            answer = generate_nebius_response(prompt)
+            if answer:
+                say(answer)
+                print("Answer:", answer)
+            else:
+                say("Sorry, I couldn't understand your question.")
+                print("Could not generate an answer for:", question)
         else:
-            # For ambiguous commands, delegate to Nebius for code generation.
+            # For ambiguous commands, first say we couldn't understand, then attempt code generation.
+            say("I couldn't understand that command. Attempting to generate code for: " + command)
+            print("Ambiguous command; attempting to generate code for:", command)
             prompt = (
                 f"Generate Python code that uses Selenium to perform the following task: {command}.\n"
                 "The code should be self-contained and include only the code with no explanations."
@@ -120,18 +151,92 @@ class Assistant:
         coords = get_object_position(item)
         return coords
 
-    def what_do_you_see(self):
+    def conversational_mode(self):
         """
-        Uses Screenpipe's OCR to return the text it sees on screen.
+        Enters conversational mode. Miso will respond to your questions with a cute personality.
+        The conversation continues until you say "ok, that's enough talking".
         """
-        from apis.screenpipe_api import get_ocr_text
-        text = get_ocr_text("everything you see")
-        if text:
-            say(f"I see: {text}")
-            print("OCR text:", text)
+        say("Sure, let's talk! You can ask me anything. Say 'ok, that's enough talking' when you're done.")
+        while True:
+            user_input = self.listen_for_speech("I'm listening...")
+            if user_input:
+                if "ok, that's enough talking" in user_input.lower():
+                    say("Alright, I'll stop talking now!")
+                    break
+                prompt = f"Answer the following question in a friendly, conversational, and cute tone: {user_input}"
+                answer = generate_nebius_response(prompt)
+                if answer:
+                    say(answer)
+                    print("Conversational answer:", answer)
+                else:
+                    say("I couldn't understand that, please try again.")
+            else:
+                say("I didn't catch that, please speak again.")
+
+    def type_in(self, prompt: str):
+        """
+        Listens for your speech and then gradually types it.
+        If prompt text is provided, it will type that text.
+        Otherwise, it listens for your spoken words.
+        """
+        if not prompt:
+            # Listen for speech
+            typed_text = self.listen_for_speech("What would you like me to type?")
         else:
-            say("I couldn't detect any text on screen.")
-            print("No OCR text found.")
+            typed_text = prompt
+        if typed_text:
+            say("Typing your text.")
+            for char in typed_text:
+                pyautogui.typewrite(char)
+                time.sleep(0.05)  # Adjust delay for gradual typing
+        else:
+            say("I didn't catch anything to type.")
+
+    def type_generate(self, prompt: str):
+        """
+        Uses Nebius to generate text based on your prompt, then gradually types it.
+        """
+        say("Generating text, please wait.")
+        generated_text = generate_nebius_response(prompt)
+        if generated_text:
+            say("Typing generated text.")
+            for char in generated_text:
+                pyautogui.typewrite(char)
+                time.sleep(0.05)
+        else:
+            say("I couldn't generate text for that prompt.")
+
+    def listen_for_speech(self, prompt: str = "") -> str:
+        """
+        Listens for a full spoken response and returns it as text.
+        """
+        if prompt:
+            say(prompt)
+        r = sr.Recognizer()
+        with sr.Microphone() as source:
+            r.adjust_for_ambient_noise(source)
+            try:
+                print("Listening for speech...")
+                audio = r.listen(source)
+                response = r.recognize_google(audio)
+                print("Speech recognized:", response)
+                return response
+            except Exception as e:
+                print("Speech recognition error:", e)
+                return ""
+
+    def shutdown(self):
+        """
+        Plays a shutdown sound and exits the application.
+        """
+        say("Shutting down. Goodbye!")
+        try:
+            from playsound import playsound
+            playsound("shutdown.mp3")
+        except Exception as e:
+            print("Error playing shutdown sound:", e)
+        QApplication.quit()
+        sys.exit(0)
 
     def confirm_and_execute_generated_code(self, code_snippet: str):
         """
